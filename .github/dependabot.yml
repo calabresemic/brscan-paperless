@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Base image in the Dockerfile (opens PRs once FROM is pinned to a digest; see README)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Action versions in .github/workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

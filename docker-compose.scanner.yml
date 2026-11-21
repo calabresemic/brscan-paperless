@@ -1,0 +1,23 @@
+# Add this service to your existing paperless-ngx docker-compose.yml (under `services:`).
+# The volume must be the SAME host folder your webserver mounts at /usr/src/paperless/consume.
+
+services:
+  brscan:
+    image: ghcr.io/calabresemic/brscan-paperless:latest
+    container_name: brscan
+    restart: unless-stopped
+    network_mode: host          # required: the printer sends button events to <host IP>:54925/udp
+    environment:
+      SCANNER_IP: 10.10.200.22
+      SCANNER_MODEL: MFC-L2690DW
+      SKEY_NAME: Paperless-ngx  # name on the printer display (keep it short, max ~15 chars)
+      SCAN_RESOLUTION: 300
+      SCAN_MODE: True Gray
+      SCAN_SOURCE: Automatic Document Feeder(left aligned)   # L2690DW ADF is single-sided
+      BLANK_REMOVAL: "true"     # mostly a safety net without duplex; "false" to disable
+      BLANK_THRESHOLD: "0.01"
+      PUID: 1000                # match USERMAP_UID / USERMAP_GID of paperless
+      PGID: 1000
+      TZ: America/New_York      # CHANGE ME
+    volumes:
+      - ./consume:/output
