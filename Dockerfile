@@ -8,11 +8,13 @@ ARG SKEY_URL=https://download.brother.com/welcome/dlf006652/brscan-skey-0.3.6-0.
 ARG SKEY_SHA256=26b480e747a61592e401ecf900fd22de69bc680cb80a130e7a2e8665180cf37c
 
 # curl is a runtime dependency of the brscan-skey package, keep it.
+# netbase provides /etc/protocols: brscan4 calls getprotobyname("tcp") without a NULL check
+# and segfaults in open_device_net_sub when the file is missing (bookworm-slim omits it).
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         sane-utils python3 python3-pil python3-img2pdf \
-        procps util-linux tini ca-certificates curl tzdata; \
+        procps util-linux tini ca-certificates curl tzdata netbase; \
     cd /tmp; \
     curl -fsSL -o brscan4.deb "$BRSCAN4_URL"; echo "$BRSCAN4_SHA256  brscan4.deb" | sha256sum -c -; \
     curl -fsSL -o skey.deb    "$SKEY_URL";    echo "$SKEY_SHA256  skey.deb"       | sha256sum -c -; \
