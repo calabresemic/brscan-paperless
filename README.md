@@ -44,22 +44,49 @@ checksum mismatch, update `BRSCAN4_*` / `SKEY_*` in the Dockerfile.
 
 ## Install
 
-1. Paste the `brscan:` service from `docker-compose.scanner.yml` into your paperless compose file's
-   `services:`, set `SCANNER_IP` and `TZ`, and point the volume at the same host folder your
-   `webserver` mounts at `/usr/src/paperless/consume`.
-2. **Stop the LXC's `brscan` service first** (`systemctl disable --now brscan` in the LXC). Two
+1. Paste the `brscan:` service and the top-level `networks:` block from
+   `docker-compose.scanner.yml` into your paperless compose file. Set `TZ` and point the volume at
+   the same host folder your `webserver` mounts at `/usr/src/paperless/consume`.
+2. Add the variables to your `.env` file:
+
+   ```
+   SCANNER_IP=      # printer IP (give it a DHCP reservation)
+   BRSCAN_PARENT=   # host interface on the printer's network, e.g. a VLAN interface
+   BRSCAN_SUBNET=   # that network's subnet in CIDR form
+   BRSCAN_GATEWAY=  # that network's gateway
+   BRSCAN_IP=       # free address for the container, outside the DHCP range
+   ```
+
+3. **Stop the LXC's `brscan` service first** (`systemctl disable --now brscan` in the LXC). Two
    `brscan-skey` instances under the same name confuse the printer.
-3. `docker compose up -d brscan && docker compose logs -f brscan`. The startup log should list
+4. `docker compose up -d brscan && docker compose logs -f brscan`. The startup log should list
    the printer as `brother4:net1;dev0 ... Active`.
-4. To update: `docker compose pull brscan && docker compose up -d brscan`.
+5. To update: `docker compose pull brscan && docker compose up -d brscan`.
+
+## Networking
+
+brscan-skey registers **the address of `eth0`** with the printer, and the printer sends button
+presses to `<that address>:54925/udp`. The container's `eth0` must therefore have an address the
+printer can reach:
+
+- **macvlan (default in the example):** the container gets its own `eth0` and IP on the printer's
+  network. No port publishing or firewall rules between networks are needed.
+  - The parent can be a VLAN interface with no IP on the host, which keeps the host itself off
+    that network. TrueNAS: Network → Interfaces → Add → VLAN.
+  - Docker allows one macvlan network per parent interface. If the parent is already used by
+    another macvlan network, put this one on a VLAN interface (or `<nic>.<vlan id>`, which Docker
+    creates for you) instead. The switch port must carry that VLAN tagged.
+  - A macvlan container can't reach its own host. That's fine here; it only writes to the
+    shared folder.
+- **Host networking (`network_mode: host`)** only works if the host has an interface literally
+  named `eth0` with an address the printer can reach (e.g. a Debian VM or LXC). Hosts with
+  `enp…`/`br…`/`vlan…` names (TrueNAS, most bare metal) register the wrong address: the startup
+  log shows the printer `Active`, but the button does nothing.
+- **Bridge networking with a published port doesn't work:** `eth0` is the Docker-internal address
+  and there is no setting to override what brscan-skey registers.
 
 ## Requirements / gotchas
 
-- **`network_mode: host` is required.** brscan-skey registers the host's IP with the printer, and the
-  printer sends button presses back to `<host>:54925/udp`. Allow that port in the host firewall.
-  The container doesn't need to join the paperless network; it only talks through the shared folder.
-- If the Docker host is itself an LXC or VM, the printer must be able to reach its IP directly
-  (no NAT between them).
 - Printer web UI → Network → Protocol → SNMP must allow **v1/v2c read-write** (community `internal`
   by default, `SNMP_COMMUNITY` to change), or the printer shows "No PC found".
 - `SKEY_NAME` is limited to about 15 characters on the display.
@@ -83,7 +110,8 @@ Swap the final `install/mv` in `scantofile.sh` for:
 
 ```bash
 curl -fsS -H "Authorization: Token $PAPERLESS_TOKEN" \
-  -F document=@"$FINAL;filename=$NAME" http://localhost:8000/api/documents/post_document/
+  -F document=@"$FINAL;filename=$NAME" "$PAPERLESS_URL/api/documents/post_document/"
 ```
 
-Because of host networking, `localhost:8000` is the webserver's published port.
+Set `PAPERLESS_URL` to an address the container can reach. On macvlan that can't be the Docker
+host's own IP; use a reverse proxy or another address on a different host.
