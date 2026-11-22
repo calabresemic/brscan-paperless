@@ -29,6 +29,7 @@ ENV SCANNER_IP="" \
     SCANNER_MODEL="MFC-L2690DW" \
     SKEY_NAME="Paperless-ngx" \
     SNMP_COMMUNITY="internal" \
+    SKEY_HOST_IP="" \
     OUTPUT_DIR=/output \
     FILENAME_PREFIX=scan \
     SCAN_RESOLUTION=300 \
