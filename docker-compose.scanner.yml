@@ -1,4 +1,5 @@
-# Add this service to your existing paperless-ngx docker-compose.yml (under `services:`).
+# Add this service to your existing paperless-ngx compose file (under `services:`) and the
+# `networks:` block at the bottom (top level). Set the ${...} variables in your .env file.
 # The volume must be the SAME host folder your webserver mounts at /usr/src/paperless/consume.
 
 services:
@@ -6,9 +7,14 @@ services:
     image: ghcr.io/calabresemic/brscan-paperless:latest
     container_name: brscan
     restart: unless-stopped
-    network_mode: host          # required: the printer sends button events to <host IP>:54925/udp
+    # The printer sends button presses to <BRSCAN_IP>:54925/udp. macvlan gives the container
+    # its own IP on the printer's network. See README "Networking" for bridge/host instead.
+    networks:
+      brscan_macvlan:
+        ipv4_address: ${BRSCAN_IP}
     environment:
-      SCANNER_IP: 10.10.200.22
+      SCANNER_IP: ${SCANNER_IP}
+      # SKEY_HOST_IP:           # address registered with the printer; auto-detected (= BRSCAN_IP here)
       SCANNER_MODEL: MFC-L2690DW
       SKEY_NAME: Paperless-ngx  # name on the printer display (keep it short, max ~15 chars)
       SCAN_RESOLUTION: 300
@@ -18,6 +24,16 @@ services:
       BLANK_THRESHOLD: "0.01"
       PUID: 1000                # match USERMAP_UID / USERMAP_GID of paperless
       PGID: 1000
-      TZ: America/New_York      # CHANGE ME
+      TZ: Etc/UTC               # set to your time zone
     volumes:
       - ./consume:/output
+
+networks:
+  brscan_macvlan:
+    driver: macvlan
+    driver_opts:
+      parent: ${BRSCAN_PARENT}  # host interface on the printer's network (a VLAN interface works)
+    ipam:
+      config:
+        - subnet: ${BRSCAN_SUBNET}
+          gateway: ${BRSCAN_GATEWAY}
