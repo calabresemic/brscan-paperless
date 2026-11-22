@@ -7,14 +7,14 @@ services:
     image: ghcr.io/calabresemic/brscan-paperless:latest
     container_name: brscan
     restart: unless-stopped
-    # brscan-skey registers the address of eth0 with the printer, which then sends button
-    # presses to <that address>:54925/udp. macvlan gives the container its own eth0 and IP
-    # on the printer's network. See README "Networking".
+    # The printer sends button presses to <BRSCAN_IP>:54925/udp. macvlan gives the container
+    # its own IP on the printer's network. See README "Networking" for bridge/host instead.
     networks:
       brscan_macvlan:
         ipv4_address: ${BRSCAN_IP}
     environment:
       SCANNER_IP: ${SCANNER_IP}
+      # SKEY_HOST_IP:           # address registered with the printer; auto-detected (= BRSCAN_IP here)
       SCANNER_MODEL: MFC-L2690DW
       SKEY_NAME: Paperless-ngx  # name on the printer display (keep it short, max ~15 chars)
       SCAN_RESOLUTION: 300
